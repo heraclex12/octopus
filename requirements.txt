@@ -1,0 +1,4 @@
+transformers
+datasets >= 1.8.0
+evaluate
+seqeval
