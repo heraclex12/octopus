@@ -1,20 +1,18 @@
 import logging
 import os
-import sys
 import random
+import sys
 from typing import Text, Optional
 
 import numpy as np
 from datasets import load_dataset
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from transformers import (
     Trainer,
     EvalPrediction,
-    AutoConfig,
-    AutoModel,
-    AutoTokenizer,
-    default_data_collator,
-    DataCollator
+    PreTrainedModel,
+    PreTrainedTokenizer,
+    DataCollator, PretrainedConfig, TrainingArguments
 )
 from transformers.trainer_utils import get_last_checkpoint
 
@@ -42,9 +40,9 @@ class BaseModel:
         self.auth_token = auth_token
         self.use_fast_tokenizer = use_fast_tokenizer
         self.ignore_mismatched_sizes = ignore_mismatched_sizes
-        self.config = AutoConfig()
-        self.model = AutoModel.from_config(self.config)
-        self.tokenizer = AutoTokenizer()
+        self.config = PretrainedConfig
+        self.model = PreTrainedModel
+        self.tokenizer = PreTrainedTokenizer
 
     def _train(
             self,
@@ -54,7 +52,8 @@ class BaseModel:
             output_dir: Text,
             resume_from_checkpoint: Optional[Text] = None,
             max_train_samples: Optional[int] = None,
-            overwrite_output_dir: bool = False
+            overwrite_output_dir: bool = False,
+            training_args: Optional[TrainingArguments] = None,
     ):
         for index in random.sample(range(len(train_dataset)), 3):
             logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
@@ -106,7 +105,10 @@ class BaseModel:
         train_file: Optional[Text] = None,
         validation_file: Optional[Text] = None,
         max_train_samples: Optional[int] = None,
-        max_eval_samples: Optional[int] = None
+        max_eval_samples: Optional[int] = None,
+        max_seq_length: int = 128,
+        overwrite_cache: bool = False,
+        pad_to_max_length: bool = True
     ):
         if dataset_name is not None:
             # Downloading and loading a dataset from the hub.
@@ -129,12 +131,18 @@ class BaseModel:
                 cache_dir=self.cache_dir,
                 use_auth_token=self.auth_token,
             )
-        train_dataset = raw_datasets['train']
+        # Process data
+        processed_datasets = self._preprocess_data(raw_datasets,
+                                                   max_seq_length=max_seq_length,
+                                                   pad_to_max_length=pad_to_max_length,
+                                                   overwrite_cache=overwrite_cache)
+
+        train_dataset = processed_datasets['train']
         if max_train_samples:
             max_train_samples = min(len(train_dataset), max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
-        if "validation" in raw_datasets:
-            eval_dataset = raw_datasets['validation']
+        if "validation" in processed_datasets:
+            eval_dataset = processed_datasets['validation']
             if max_eval_samples:
                 max_eval_samples = min(len(eval_dataset), max_eval_samples)
                 eval_dataset = eval_dataset.select(range(max_eval_samples))
@@ -142,9 +150,17 @@ class BaseModel:
             eval_dataset = None
         return train_dataset, eval_dataset
 
-    @staticmethod
-    def _get_collator():
-        return default_data_collator
+    def _preprocess_data(
+            self,
+            dataset,
+            max_seq_length: int = 128,
+            pad_to_max_length: bool = True,
+            overwrite_cache: bool = False
+    ):
+        raise NotImplementedError("Hasn't implemented yet!")
+
+    def _get_collator(self, padding: bool = True, fp16: bool = True):
+        return None
 
     def train(
             self,
@@ -153,11 +169,17 @@ class BaseModel:
             dataset_config_name: Optional[Text] = None,
             train_file: Optional[Text] = None,
             validation_file: Optional[Text] = None,
+            max_seq_length: Optional[int] = 128,
+            overwrite_cache: bool = False,
             resume_from_checkpoint: Optional[Text] = None,
             max_train_samples: Optional[int] = None,
             max_eval_samples: Optional[int] = None,
-            overwrite_output_dir: bool = False
+            overwrite_output_dir: bool = False,
+            fp16: bool = True,
+            pad_to_max_length: bool = True,
+            **kwargs
     ):
+        training_args = TrainingArguments(**kwargs)
         if dataset_name is None and train_file is None:
             raise ValueError("Need either a training/validation file or a dataset name.")
         else:
@@ -174,15 +196,19 @@ class BaseModel:
                                                          train_file=train_file,
                                                          validation_file=validation_file,
                                                          max_train_samples=max_train_samples,
-                                                         max_eval_samples=max_eval_samples)
+                                                         max_eval_samples=max_eval_samples,
+                                                         max_seq_length=max_seq_length,
+                                                         overwrite_cache=overwrite_cache,
+                                                         pad_to_max_length=pad_to_max_length)
         self._train(
             train_dataset,
             eval_dataset,
-            data_collator=self._get_collator(),
+            data_collator=self._get_collator(pad_to_max_length, fp16),
             output_dir=output_dir,
             resume_from_checkpoint=resume_from_checkpoint,
             max_train_samples=max_train_samples,
-            overwrite_output_dir=overwrite_output_dir
+            overwrite_output_dir=overwrite_output_dir,
+            training_args=training_args,
         )
 
     def evaluate(self):
