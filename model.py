@@ -4,7 +4,9 @@ import random
 import sys
 from typing import Text, Optional
 
+import datasets
 import numpy as np
+import transformers
 from datasets import load_dataset
 from torch.utils.data import Dataset
 from transformers import (
@@ -22,6 +24,11 @@ logging.basicConfig(
     datefmt="%m/%d/%Y %H:%M:%S",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
+logger.setLevel(logging.INFO)
+datasets.utils.logging.set_verbosity(logging.INFO)
+transformers.utils.logging.set_verbosity(logging.INFO)
+transformers.utils.logging.enable_default_handler()
+transformers.utils.logging.enable_explicit_format()
 
 
 class BaseModel:
@@ -174,15 +181,20 @@ class BaseModel:
             resume_from_checkpoint: Optional[Text] = None,
             max_train_samples: Optional[int] = None,
             max_eval_samples: Optional[int] = None,
-            overwrite_output_dir: bool = False,
-            fp16: bool = True,
             pad_to_max_length: bool = True,
             **kwargs
     ):
+        kwargs['output_dir'] = output_dir
         training_args = TrainingArguments(**kwargs)
+        logger.warning(
+            f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
+            + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+        )
+        logger.info(f"Training/evaluation parameters {training_args}")
+
         if dataset_name is None and train_file is None:
             raise ValueError("Need either a training/validation file or a dataset name.")
-        else:
+        elif train_file is not None:
             train_extension = train_file.split(".")[-1]
             assert train_extension in ["csv", "json"], "`train_file` should be a csv or a json file."
             if validation_file is not None:
@@ -203,11 +215,11 @@ class BaseModel:
         self._train(
             train_dataset,
             eval_dataset,
-            data_collator=self._get_collator(pad_to_max_length, fp16),
+            data_collator=self._get_collator(pad_to_max_length, training_args.fp16),
             output_dir=output_dir,
             resume_from_checkpoint=resume_from_checkpoint,
             max_train_samples=max_train_samples,
-            overwrite_output_dir=overwrite_output_dir,
+            overwrite_output_dir=training_args.overwrite_output_dir,
             training_args=training_args,
         )
 
