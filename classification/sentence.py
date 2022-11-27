@@ -3,15 +3,16 @@ import os
 import sys
 from typing import Text, Optional, Union, Dict, List, Any
 
-from torch import nn
+import numpy as np
+from torch import nn, Tensor
 from transformers import (
     AutoConfig,
     AutoTokenizer,
     AutoModelForSequenceClassification,
     default_data_collator,
-    DataCollatorWithPadding, PretrainedConfig
+    DataCollatorWithPadding, PretrainedConfig, EvalPrediction
 )
-
+from utils.helpers import sigmoid, softmax
 from model import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -177,3 +178,45 @@ class SentenceClassifier(BaseModel):
             }
         )
         return processed_dataset
+
+    @staticmethod
+    def compute_metrics(p: EvalPrediction):
+        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+        preds = np.argmax(preds, axis=1)
+        return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
+
+    def preprocess(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
+        if isinstance(inputs, dict):
+            return self.tokenizer(**inputs, return_tensors='pt', **kwargs)
+        elif isinstance(inputs, list) and len(inputs) == 1 and isinstance(inputs[0], list) and len(inputs[0]) == 2:
+            return self.tokenizer(
+                text=inputs[0][0], text_pair=inputs[0][1], return_tensors='pt', **kwargs
+            )
+        elif isinstance(inputs, list) and len(inputs) == 2:
+            return self.tokenizer(
+                text=inputs[0], text_pair=inputs[1], return_tensors='pt', **kwargs
+            )
+        return self.tokenizer(inputs, return_tensors='pt', **kwargs)
+
+    def postprocess(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
+        outputs = model_outputs["logits"][0]
+        outputs = outputs.detach().numpy()
+
+        if activation == 'sigmoid':
+            scores = sigmoid(outputs)
+        elif activation == 'softmax':
+            scores = softmax(outputs)
+        elif activation is None:
+            scores = outputs
+        else:
+            raise ValueError(f"Unrecognized `activation` argument: {activation}")
+
+        if top_k == 1:
+            return {"label": self.model.config.id2label[scores.argmax().item()], "score": scores.max().item()}
+        else:
+            dict_scores = [
+                {"label": self.model.config.id2label[i], "score": score.item()} for i, score in enumerate(scores)
+            ]
+            dict_scores.sort(key=lambda x: x["score"], reverse=True)
+            dict_scores = dict_scores[:top_k]
+        return dict_scores

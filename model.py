@@ -2,12 +2,13 @@ import logging
 import os
 import random
 import sys
-from typing import Text, Optional
+from typing import Text, Optional, Any, Dict
 
 import datasets
 import numpy as np
 import transformers
 from datasets import load_dataset
+from torch import Tensor
 from torch.utils.data import Dataset
 from transformers import (
     Trainer,
@@ -226,8 +227,20 @@ class BaseModel:
     def evaluate(self):
         pass
 
-    def predict(self):
-        pass
+    def predict(self, inputs, activation: Text = "softmax", top_k: int = 1):
+        model_inputs = self.preprocess(inputs)
+        model_outputs = self.forward(model_inputs)
+        outputs = self.postprocess(model_outputs, activation, top_k)
+        return outputs
+
+    def preprocess(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
+        return self.tokenizer(inputs, return_tensors='pt', **kwargs)
+
+    def forward(self, model_inputs: Dict[str, Tensor]):
+        return self.model(**model_inputs)
+
+    def postprocess(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
+        raise NotImplementedError("Hasn't implemented yet!")
 
     @staticmethod
     def compute_metrics(p: EvalPrediction):
