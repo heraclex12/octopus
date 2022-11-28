@@ -3,6 +3,10 @@ import os
 from typing import Text, Optional, Union
 import click
 import json
+
+import datasets
+import transformers
+
 from classification.sentence import SentenceClassifier
 from utils.helpers import makerdir
 
@@ -23,8 +27,8 @@ def commands():
 @click.option('--dataset_config_name', help='The configuration name of the dataset to use (via the datasets library).')
 @click.option('--train_file', help='A csv or a json file containing the training data.')
 @click.option('--validation_file', help='A csv or a json file containing the validation data.')
-@click.option('--max_length', help='The maximum total input sequence length after tokenization.')
-@click.option('--overwrite_cache', help='Overwrite the cached training and evaluation sets.')
+@click.option('--max_length', type=int, default=128, help='The maximum total input sequence length after tokenization.')
+@click.option('--overwrite_cache', is_flag=True, default=False, help='Overwrite the cached training and evaluation sets.')
 @click.option('--resume_from_checkpoint', help='If the training should continue from a checkpoint folder.')
 @click.option('--n_train', help='For debugging purposes or quicker training, '
                                 'truncate the number of training examples to this value.')
@@ -32,13 +36,13 @@ def commands():
                                'truncate the number of evaluation examples to this value.')
 @click.option('--padding', is_flag=True, default=True, help='Whether to pad all samples to `max_length`.')
 @click.option('--fp16', is_flag=True, default=True, help='Whether to use mixed-precision fp16.')
-@click.option('--batch_size', help='Batch size for the training.')
-@click.option('--epochs', help='Total number of training epochs to perform.')
-@click.option('--lr', help='Initial learning rate (after the potential warmup period) to use.')
-@click.option('--warmup_steps', help='Number of steps for the warmup in the lr scheduler.')
-@click.option('--gradient_accumulation_steps', help='Number of updates steps to accumulate before performing '
-                                                    'a backward/update pass.')
-@click.option('--weight_decay', help='Weight decay to use.')
+@click.option('--batch_size', type=int, default=32, help='Batch size for the training.')
+@click.option('--epochs', type=int, default=3, help='Total number of training epochs to perform.')
+@click.option('--lr', type=float, default=3e-5, help='Initial learning rate (after the potential warmup period) to use.')
+@click.option('--warmup_steps', type=int, default=0, help='Number of steps for the warmup in the lr scheduler.')
+@click.option('--gradient_accumulation_steps', type=int, default=1, help='Number of updates steps to accumulate '
+                                                                         'before performing a backward/update pass.')
+@click.option('--weight_decay', type=float, default=0.0, help='Weight decay to use.')
 @click.option('--hub_token', help='The token to use to pull the model from HuggingFace Hub.')
 @click.option('--use_fast', is_flag=True, default=True, help='Whether to use fast Tokenizer.')
 def train(
@@ -66,6 +70,8 @@ def train(
         use_fast: bool = True
 ) -> None:
     logger.setLevel(logging.DEBUG)
+    datasets.utils.logging.set_verbosity(logging.DEBUG)
+    transformers.utils.logging.set_verbosity(logging.DEBUG)
     if task_name == 'sentence-classification':
         model = SentenceClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
     else:
