@@ -1,12 +1,13 @@
 import logging
 import os
-from typing import Text, Optional
+from typing import Text, Optional, Union
 import click
-
+import json
 from classification.sentence import SentenceClassifier
+from utils.helpers import makerdir
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
-logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 @click.group()
@@ -64,12 +65,14 @@ def train(
         hub_token: Optional[Text] = None,
         use_fast: bool = True
 ) -> None:
+    logger.setLevel(logging.DEBUG)
     if task_name == 'sentence-classification':
         model = SentenceClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
     else:
         raise ValueError("Currently we only support `sentence-classification`")
     if output_dir is None:
         output_dir = os.path.join(CURRENT_DIR, 'outputs/')
+        makerdir(output_dir)
 
     model.train(output_dir=output_dir,
                 dataset_name=dataset_name,
@@ -97,28 +100,39 @@ def train(
 @click.option('--task_name', help='Name of the training task. Currently we only support `sentence-classification')
 @click.option('--model_name', help='Path to pretrained model or model identifier from huggingface.co/models.')
 @click.option('--eval_file', help='A csv or a json file containing the evaluation data.')
-@click.option('--max_length', help='The maximum total input sequence length after tokenization.')
-@click.option('--padding', is_flag=True, default=True, help='Whether to pad all samples to `max_length`.')
+@click.option('--output_dir', help='Where to store the evaluation results.')
+@click.option('--max_length', type=int, default=128, help='The maximum total input sequence length after tokenization.')
+@click.option('--padding', default='max_length', help='Whether to pad all samples to `max_length`.')
 @click.option('--fp16', is_flag=True, default=True, help='Whether to use mixed-precision fp16.')
-@click.option('--batch_size', help='Batch size for the training.')
+@click.option('--batch_size', type=int, default=32, help='Batch size for the training.')
 @click.option('--hub_token', help='The token to use to pull the model from HuggingFace Hub.')
 @click.option('--use_fast', is_flag=True, default=True, help='Whether to use fast Tokenizer.')
 def evaluate(
         task_name: Text,
         model_name: Text,
+        output_dir: Optional[Text] = None,
         eval_file: Optional[Text] = None,
         max_length: Optional[int] = 128,
-        padding: bool = True,
+        padding: Union[bool, Text] = True,
         fp16: bool = True,
         batch_size: int = 32,
         hub_token: Optional[Text] = None,
         use_fast: bool = True
 ):
+    logger.setLevel(logging.INFO)
     if task_name == 'sentence-classification':
         model = SentenceClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
     else:
         raise ValueError("Currently we only support `sentence-classification`")
-    model.evaluate(eval_file, batch_size=batch_size, max_length=max_length, padding=padding, fp16=fp16)
+    if output_dir is None:
+        output_dir = os.path.join(CURRENT_DIR, 'outputs/')
+        makerdir(output_dir)
+
+    results = model.evaluate(eval_file, batch_size=batch_size, max_length=max_length, padding=padding, fp16=fp16)
+    with open(os.path.join(output_dir, "evaluation_results.json"), 'w') as f:
+        results['task_name'] = task_name
+        results['model_name'] = model_name
+        json.dump(results, f)
 
 
 if __name__ == "__main__":
