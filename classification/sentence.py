@@ -141,9 +141,11 @@ class SentenceClassifier(BaseModel):
         dataset,
         max_seq_length: int = 128,
         pad_to_max_length: bool = True,
-        overwrite_cache: bool = False
+        overwrite_cache: bool = False,
+        do_train: bool = True,
+        split: Text = "train"
     ):
-        non_label_column_names = [name for name in dataset["train"].column_names if name != "label"]
+        non_label_column_names = [name for name in dataset[split].column_names if name != "label"]
         if "input1" in non_label_column_names and "input2" in non_label_column_names:
             input_key_1, input_key_2 = "input1", "input2"
         elif 'input' in non_label_column_names:
@@ -161,9 +163,10 @@ class SentenceClassifier(BaseModel):
                 f"model ({self.tokenizer.model_max_length}). Using max_seq_length={self.tokenizer.model_max_length}."
             )
         max_seq_length = min(max_seq_length, self.tokenizer.model_max_length)
-        label_list = dataset["train"].unique("label")
-        label_list.sort()
-        self._update_model_number_labels(label_list)
+        if do_train:
+            label_list = dataset[split].unique("label")
+            label_list.sort()
+            self._update_model_number_labels(label_list)
 
         processed_dataset = dataset.map(
             self._preprocess_function,
@@ -185,7 +188,7 @@ class SentenceClassifier(BaseModel):
         preds = np.argmax(preds, axis=1)
         return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
 
-    def preprocess(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
+    def preprocess_input(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
         if isinstance(inputs, dict):
             return self.tokenizer(**inputs, return_tensors='pt', **kwargs)
         elif isinstance(inputs, list) and len(inputs) == 1 and isinstance(inputs[0], list) and len(inputs[0]) == 2:
@@ -198,7 +201,7 @@ class SentenceClassifier(BaseModel):
             )
         return self.tokenizer(inputs, return_tensors='pt', **kwargs)
 
-    def postprocess(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
+    def postprocess_output(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
         outputs = model_outputs["logits"][0]
         outputs = outputs.detach().numpy()
 

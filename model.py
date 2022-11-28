@@ -2,19 +2,20 @@ import logging
 import os
 import random
 import sys
-from typing import Text, Optional, Any, Dict
+from typing import Text, Optional, Any, Dict, Union
 
 import datasets
 import numpy as np
+import torch
 import transformers
 from datasets import load_dataset
 from torch import Tensor
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from transformers import (
     Trainer,
     EvalPrediction,
     PreTrainedModel,
-    PreTrainedTokenizer,
+    PreTrainedTokenizerFast,
     DataCollator, PretrainedConfig, TrainingArguments
 )
 from transformers.trainer_utils import get_last_checkpoint
@@ -50,7 +51,7 @@ class BaseModel:
         self.ignore_mismatched_sizes = ignore_mismatched_sizes
         self.config = PretrainedConfig
         self.model = PreTrainedModel
-        self.tokenizer = PreTrainedTokenizer
+        self.tokenizer = PreTrainedTokenizerFast
 
     def _train(
             self,
@@ -143,7 +144,9 @@ class BaseModel:
         processed_datasets = self._preprocess_data(raw_datasets,
                                                    max_seq_length=max_seq_length,
                                                    pad_to_max_length=pad_to_max_length,
-                                                   overwrite_cache=overwrite_cache)
+                                                   overwrite_cache=overwrite_cache,
+                                                   do_train=True,
+                                                   split="train")
 
         train_dataset = processed_datasets['train']
         if max_train_samples:
@@ -163,7 +166,9 @@ class BaseModel:
             dataset,
             max_seq_length: int = 128,
             pad_to_max_length: bool = True,
-            overwrite_cache: bool = False
+            overwrite_cache: bool = False,
+            do_train: bool = True,
+            split: Text = "train",
     ):
         raise NotImplementedError("Hasn't implemented yet!")
 
@@ -224,22 +229,61 @@ class BaseModel:
             training_args=training_args,
         )
 
-    def evaluate(self):
-        pass
+    def evaluate(
+            self,
+            eval_file,
+            batch_size: int = 32,
+            max_length: int = 128,
+            padding: Union[bool, Text] = 'max_length',
+            fp16: bool = True,
+            overwrite_cache: bool = False,
+    ) -> Dict:
+        extension = eval_file.split(".")[-1]
+        eval_dataset = load_dataset(
+            extension,
+            data_files={'validation': eval_file},
+            cache_dir=self.cache_dir,
+            use_auth_token=self.auth_token,
+        )
+        eval_dataset = self._preprocess_data(eval_dataset,
+                                             max_seq_length=max_length,
+                                             pad_to_max_length=padding,
+                                             overwrite_cache=overwrite_cache,
+                                             do_train=False,
+                                             split="validation")
+        eval_dataloader = DataLoader(eval_dataset["validation"],
+                                     collate_fn=self._get_collator(padding, fp16),
+                                     batch_size=batch_size)
+
+        self.model.eval()
+        predictions = []
+        references = []
+        for step, batch in enumerate(eval_dataloader):
+            with torch.no_grad():
+                outputs = self.forward(batch)
+            pred = outputs.logits.tolist()
+            predictions.extend(pred)
+            references.extend(batch["labels"])
+
+        predictions = np.array(predictions)
+        references = np.array(references)
+        eval_metric = self.compute_metrics(EvalPrediction(predictions, references))
+        logger.info(f"{eval_metric}")
+        return eval_metric
 
     def predict(self, inputs, activation: Text = "softmax", top_k: int = 1):
-        model_inputs = self.preprocess(inputs)
+        model_inputs = self.preprocess_input(inputs)
         model_outputs = self.forward(model_inputs)
-        outputs = self.postprocess(model_outputs, activation, top_k)
+        outputs = self.postprocess_output(model_outputs, activation, top_k)
         return outputs
 
-    def preprocess(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
+    def preprocess_input(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
         return self.tokenizer(inputs, return_tensors='pt', **kwargs)
 
     def forward(self, model_inputs: Dict[str, Tensor]):
         return self.model(**model_inputs)
 
-    def postprocess(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
+    def postprocess_output(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
         raise NotImplementedError("Hasn't implemented yet!")
 
     @staticmethod
