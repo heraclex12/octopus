@@ -45,6 +45,7 @@ def commands():
 @click.option('--weight_decay', type=float, default=0.0, help='Weight decay to use.')
 @click.option('--hub_token', help='The token to use to pull the model from HuggingFace Hub.')
 @click.option('--use_fast', is_flag=True, default=True, help='Whether to use fast Tokenizer.')
+@click.option('--overwrite_output_dir', is_flag=True, default=False, help='Whether to overwrite the existing output dir.')
 def train(
         task_name: Text,
         model_name: Text,
@@ -67,7 +68,8 @@ def train(
         gradient_accumulation_steps: int = 1,
         weight_decay: float = 0.0,
         hub_token: Optional[Text] = None,
-        use_fast: bool = True
+        use_fast: bool = True,
+        overwrite_output_dir: bool = False,
 ) -> None:
     logger.setLevel(logging.DEBUG)
     datasets.utils.logging.set_verbosity(logging.DEBUG)
@@ -99,7 +101,8 @@ def train(
                 learning_rate=lr,
                 warmup_steps=warmup_steps,
                 gradient_accumulation_steps=gradient_accumulation_steps,
-                weight_decay=weight_decay)
+                weight_decay=weight_decay,
+                overwrite_output_dir=overwrite_output_dir)
 
 
 @commands.command()
