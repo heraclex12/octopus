@@ -1,6 +1,6 @@
 from typing import Text
 
-from model import BaseModel
+from base import BaseModel
 
 
 class TokenClassifier(BaseModel):

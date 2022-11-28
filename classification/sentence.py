@@ -13,7 +13,7 @@ from transformers import (
     DataCollatorWithPadding, PretrainedConfig, EvalPrediction
 )
 from utils.helpers import sigmoid, softmax
-from model import BaseModel
+from base import BaseModel
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
