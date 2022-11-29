@@ -114,6 +114,9 @@ def train(
 @click.option('--padding', default='max_length', help='Whether to pad all samples to `max_length`.')
 @click.option('--fp16', is_flag=True, default=True, help='Whether to use mixed-precision fp16.')
 @click.option('--batch_size', type=int, default=32, help='Batch size for the training.')
+@click.option('--metric', type=str, default="accuracy", help='Metric type to compute score.')
+@click.option('--metric_average', type=str, default=None, help='Determines the type of averaging performed on '
+                                                               'the metrics (used for recall/precision/f1)')
 @click.option('--hub_token', help='The token to use to pull the model from HuggingFace Hub.')
 @click.option('--use_fast', is_flag=True, default=True, help='Whether to use fast Tokenizer.')
 def evaluate(
@@ -125,8 +128,11 @@ def evaluate(
         padding: Union[bool, Text] = True,
         fp16: bool = True,
         batch_size: int = 32,
+        metric: Text = "accuracy",
+        metric_average: Optional[Text] = None,
         hub_token: Optional[Text] = None,
-        use_fast: bool = True
+        use_fast: bool = True,
+        **kwargs
 ):
     logger.setLevel(logging.INFO)
     if task_name == 'sentence-classification':
@@ -137,7 +143,14 @@ def evaluate(
         output_dir = os.path.join(CURRENT_DIR, 'outputs/')
         makerdir(output_dir)
 
-    results = model.evaluate(eval_file, batch_size=batch_size, max_length=max_length, padding=padding, fp16=fp16)
+    results = model.evaluate(eval_file,
+                             batch_size=batch_size,
+                             max_length=max_length,
+                             padding=padding,
+                             fp16=fp16,
+                             metric=metric,
+                             average=metric_average,
+                             **kwargs)
     with open(os.path.join(output_dir, "evaluation_results.json"), 'w') as f:
         results['task_name'] = task_name
         results['model_name'] = model_name

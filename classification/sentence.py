@@ -12,6 +12,8 @@ from transformers import (
     default_data_collator,
     DataCollatorWithPadding, PretrainedConfig, EvalPrediction
 )
+
+from utils import metrics
 from utils.helpers import sigmoid, softmax
 from base import BaseModel
 
@@ -21,6 +23,8 @@ logging.basicConfig(
     datefmt="%m/%d/%Y %H:%M:%S",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
+
+_DEFAULT_METRIC = metrics.accuracy
 
 
 class SentenceClassifier(BaseModel):
@@ -181,12 +185,6 @@ class SentenceClassifier(BaseModel):
             }
         )
         return processed_dataset
-
-    @staticmethod
-    def compute_metrics(p: EvalPrediction):
-        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-        preds = np.argmax(preds, axis=1)
-        return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
 
     def preprocess_input(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
         if isinstance(inputs, dict):

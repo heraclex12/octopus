@@ -19,6 +19,8 @@ from transformers import (
     DataCollator, PretrainedConfig, TrainingArguments
 )
 from transformers.trainer_utils import get_last_checkpoint
+from utils import metrics
+from utils.metrics import SUPPORTED_METRICS
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -31,6 +33,8 @@ datasets.utils.logging.set_verbosity(logging.INFO)
 transformers.utils.logging.set_verbosity(logging.INFO)
 transformers.utils.logging.enable_default_handler()
 transformers.utils.logging.enable_explicit_format()
+
+_DEFAULT_METRIC = metrics.accuracy
 
 
 class BaseModel:
@@ -237,6 +241,8 @@ class BaseModel:
             padding: Union[bool, Text] = 'max_length',
             fp16: bool = True,
             overwrite_cache: bool = False,
+            metric: Optional[Text] = None,
+            **kwargs,
     ) -> Dict:
         extension = eval_file.split(".")[-1]
         eval_dataset = load_dataset(
@@ -267,7 +273,7 @@ class BaseModel:
 
         predictions = np.array(predictions)
         references = np.array(references)
-        eval_metric = self.compute_metrics(EvalPrediction(predictions, references))
+        eval_metric = self.compute_metrics(EvalPrediction(predictions, references), metric=metric, **kwargs)
         logger.info(f"{eval_metric}")
         return eval_metric
 
@@ -287,7 +293,16 @@ class BaseModel:
         raise NotImplementedError("Hasn't implemented yet!")
 
     @staticmethod
-    def compute_metrics(p: EvalPrediction):
+    def compute_metrics(p: EvalPrediction, metric: Optional[Text] = None, **kwargs):
+        if metric and metric not in SUPPORTED_METRICS:
+            raise ValueError(f"We haven't supported `{metric}` yet."
+                             f" Please contact your team to add this metric."
+                             f" Current support: {SUPPORTED_METRICS}")
+        if metric is None:
+            metric_func = _DEFAULT_METRIC
+        else:
+            metric_func = getattr(metrics, metric)
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-        preds = np.argmax(preds, axis=1)
-        return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
+        if metric != "mse":
+            preds = np.argmax(preds, axis=1)
+        return metric_func(predictions=preds, references=p.label_ids, **kwargs)
