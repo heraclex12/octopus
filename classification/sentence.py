@@ -148,7 +148,7 @@ class SentenceClassifier(BaseModel):
         split: Text = "train",
         **kwargs,
     ):
-        non_label_column_names = [name for name in dataset[split].column_names if name != "label"]
+        non_label_column_names = [name for name in dataset[split].column_names if name != "label" and name != "id"]
         if "input1" in non_label_column_names and "input2" in non_label_column_names:
             input_key_1, input_key_2 = "input1", "input2"
         elif 'input' in non_label_column_names:

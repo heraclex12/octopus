@@ -7,6 +7,7 @@ import datasets
 import transformers
 
 from classification.sentence import SentenceClassifier
+from classification.token import TokenClassifier
 from utils.helpers import makerdir
 from utils.model_selection import select_model_suggestion
 
@@ -78,8 +79,10 @@ def train(
         model_name, hub_token = select_model_suggestion()
     if task_name == 'sentence-classification':
         model = SentenceClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
+    elif task_name == 'token-classification':
+        model = TokenClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
     else:
-        raise ValueError("Currently we only support `sentence-classification`")
+        raise ValueError("Currently we only support `sentence-classification` and `token-classification`")
     if output_dir is None:
         output_dir = os.path.join(CURRENT_DIR, 'outputs/')
         makerdir(output_dir)

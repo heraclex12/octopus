@@ -93,9 +93,9 @@ class TokenClassifier(BaseModel):
         self,
         examples,
         input_key: Text,
+        label_key: Text,
         max_seq_length: int = 128,
         padding: Union[Text, bool] = True,
-        label_to_id: Optional[Dict[Text, int]] = None,
         label_all_tokens: bool = False,
     ):
         tokenized_inputs = self.tokenizer(
@@ -107,7 +107,7 @@ class TokenClassifier(BaseModel):
             is_split_into_words=True,
         )
         labels = []
-        for i, label in enumerate(examples["label"]):
+        for i, label in enumerate(examples[label_key]):
             word_ids = tokenized_inputs.word_ids(batch_index=i)
             previous_word_idx = None
             label_ids = []
@@ -118,12 +118,12 @@ class TokenClassifier(BaseModel):
                     label_ids.append(-100)
                 # We set the label for the first token of each word.
                 elif word_idx != previous_word_idx:
-                    label_ids.append(label_to_id[label[word_idx]])
+                    label_ids.append(self.model.config.label2id[label[word_idx]])
                 # For the other tokens in a word, we set the label to either the current label or -100, depending on
                 # the label_all_tokens flag.
                 else:
                     if label_all_tokens:
-                        label_ids.append(self.model.config.b2i_label[label_to_id[label[word_idx]]])
+                        label_ids.append(self.model.config.b2i_label[self.model.config.label2id[label[word_idx]]])
                     else:
                         label_ids.append(-100)
                 previous_word_idx = word_idx
@@ -164,7 +164,7 @@ class TokenClassifier(BaseModel):
             label_to_id = {v: i for i, v in enumerate(label_list)}
         b_to_i_label = []
         for idx, label in enumerate(label_list):
-            if label.startswith("B-") and label.replace("B-", "I-") in label_list:
+            if type(label) == str and label.startswith("B-") and label.replace("B-", "I-") in label_list:
                 b_to_i_label.append(label_list.index(label.replace("B-", "I-")))
             else:
                 b_to_i_label.append(idx)
@@ -182,11 +182,9 @@ class TokenClassifier(BaseModel):
         split: Text = "train",
         **kwargs,
     ):
-        non_label_column_names = [name for name in dataset[split].column_names if name != "label"]
-        if 'input' in non_label_column_names:
-            input_key = "input"
-        else:
-            input_key = non_label_column_names[0]
+        column_names = [col for col in dataset[split].column_names if col != 'id']
+        input_key = "input" if 'input' in column_names else column_names[0]
+        label_key = "label" if 'label' in column_names else column_names[1]
         padding = "max_length" if pad_to_max_length else False
         if max_seq_length > self.tokenizer.model_max_length:
             logger.warning(
@@ -195,7 +193,10 @@ class TokenClassifier(BaseModel):
             )
         max_seq_length = min(max_seq_length, self.tokenizer.model_max_length)
         if do_train:
-            label_list = dataset[split].unique("label")
+            unique_labels = set()
+            for label in dataset[split][label_key]:
+                unique_labels = unique_labels | set(label)
+            label_list = list(unique_labels)
             label_list.sort()
             self._update_model_number_labels(label_list)
 
@@ -207,8 +208,9 @@ class TokenClassifier(BaseModel):
             fn_kwargs={
                 'max_seq_length': max_seq_length,
                 'input_key': input_key,
+                'label_key': label_key,
                 'padding': padding,
-                'label_all_tokens': kwargs['label_all_tokens']
+                'label_all_tokens': kwargs.get('label_all_tokens')
             }
         )
         return processed_dataset
@@ -264,7 +266,7 @@ class TokenClassifier(BaseModel):
         ]
 
         results = _DEFAULT_METRIC(predictions=true_predictions, references=true_labels)
-        if kwargs['return_entity_level_metrics']:
+        if kwargs.get('return_entity_level_metrics'):
             # Unpack nested dictionaries
             final_results = {}
             for key, value in results.items():
