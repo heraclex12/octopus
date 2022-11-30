@@ -1,21 +1,19 @@
 import logging
-import os
 import sys
 from typing import Text, Optional, Union, Dict, List, Any
 
-import numpy as np
 from torch import nn, Tensor
 from transformers import (
     AutoConfig,
     AutoTokenizer,
     AutoModelForSequenceClassification,
     default_data_collator,
-    DataCollatorWithPadding, PretrainedConfig, EvalPrediction
+    DataCollatorWithPadding, PretrainedConfig
 )
 
+from base import BaseModel
 from utils import metrics
 from utils.helpers import sigmoid, softmax
-from base import BaseModel
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
