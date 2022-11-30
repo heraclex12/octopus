@@ -3,12 +3,12 @@ import os
 from typing import Text, Optional, Union
 import click
 import json
-
 import datasets
 import transformers
 
 from classification.sentence import SentenceClassifier
 from utils.helpers import makerdir
+from utils.model_selection import select_model_suggestion
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 logger = logging.getLogger(__name__)
@@ -74,6 +74,8 @@ def train(
     logger.setLevel(logging.DEBUG)
     datasets.utils.logging.set_verbosity(logging.DEBUG)
     transformers.utils.logging.set_verbosity(logging.DEBUG)
+    if model_name is None:
+        model_name, hub_token = select_model_suggestion()
     if task_name == 'sentence-classification':
         model = SentenceClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
     else:
