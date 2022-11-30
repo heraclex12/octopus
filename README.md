@@ -59,7 +59,7 @@ print(model.predict("Good night 😊"))
 
 🔮 The guide below shows you how to train a Text classifier via CLI.
 ```commandline
-$ python3 run_cli.py train --task_name=sentence-classification \
+python3 run_cli.py train --task_name=sentence-classification \
                           --model_name=<model_name> \
                           --train_file=<path_to_train_file> \
                           --validation_file=<path_to_validation_file> \
@@ -78,7 +78,7 @@ For training, if you don't know what pretrained model to use, just remove the `m
 
 🔥 To evaluate the model,
 ```commandline
-$ python3 run_cli.py evaluate --task_name=sentence-classification \
+python3 run_cli.py evaluate --task_name=sentence-classification \
                              --model_name=<model_name> \
                              --eval_file=<path_to_train_file> \
                              --max_length=128 \
@@ -106,6 +106,14 @@ JSON format
 {"id": 2, "input": "<sentence_2>", "label": "<label_2>"}
 ...
 ```
+
+## Application Examples
+
+Currently, we support applications below:
+- [Text Classification](./classification/README.md)
+- [Token Classification](./classification/README.md)
+
+Please refer to specific application example for more details.
 
 ## Contact
 
