@@ -121,7 +121,8 @@ class BaseModel:
         max_eval_samples: Optional[int] = None,
         max_seq_length: int = 128,
         overwrite_cache: bool = False,
-        pad_to_max_length: bool = True
+        pad_to_max_length: bool = True,
+        **kwargs,
     ):
         if dataset_name is not None:
             # Downloading and loading a dataset from the hub.
@@ -150,7 +151,8 @@ class BaseModel:
                                                    pad_to_max_length=pad_to_max_length,
                                                    overwrite_cache=overwrite_cache,
                                                    do_train=True,
-                                                   split="train")
+                                                   split="train",
+                                                   **kwargs)
 
         train_dataset = processed_datasets['train']
         if max_train_samples:
@@ -173,6 +175,7 @@ class BaseModel:
             overwrite_cache: bool = False,
             do_train: bool = True,
             split: Text = "train",
+            **kwargs,
     ):
         raise NotImplementedError("Hasn't implemented yet!")
 
@@ -221,7 +224,8 @@ class BaseModel:
                                                          max_eval_samples=max_eval_samples,
                                                          max_seq_length=max_seq_length,
                                                          overwrite_cache=overwrite_cache,
-                                                         pad_to_max_length=pad_to_max_length)
+                                                         pad_to_max_length=pad_to_max_length,
+                                                         **kwargs)
         self._train(
             train_dataset,
             eval_dataset,
@@ -256,7 +260,8 @@ class BaseModel:
                                              pad_to_max_length=padding,
                                              overwrite_cache=overwrite_cache,
                                              do_train=False,
-                                             split="validation")
+                                             split="validation",
+                                             **kwargs)
         eval_dataloader = DataLoader(eval_dataset["validation"],
                                      collate_fn=self._get_collator(padding, fp16),
                                      batch_size=batch_size)
@@ -292,8 +297,7 @@ class BaseModel:
     def postprocess_output(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
         raise NotImplementedError("Hasn't implemented yet!")
 
-    @staticmethod
-    def compute_metrics(p: EvalPrediction, metric: Optional[Text] = None, **kwargs):
+    def compute_metrics(self, p: EvalPrediction, metric: Optional[Text] = None, **kwargs):
         if metric and metric not in SUPPORTED_METRICS:
             raise ValueError(f"We haven't supported `{metric}` yet."
                              f" Please contact your team to add this metric."

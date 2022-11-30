@@ -35,7 +35,7 @@ class SentenceClassifier(BaseModel):
         auth_token: Optional[Text] = None,
         use_tf: bool = False,
         use_fast_tokenizer: bool = True,
-        ignore_mismatched_sizes: bool = False,
+        ignore_mismatched_sizes: bool = True,
     ):
         super().__init__(
             model_name=model_name,
@@ -98,12 +98,12 @@ class SentenceClassifier(BaseModel):
         args = (
             (examples[input_key_1],) if input_key_2 is None else (examples[input_key_1], examples[input_key_2])
         )
-        result = self.tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
+        tokenized_inputs = self.tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
 
         # Map labels to IDs
         if label_to_id is not None and "label" in examples:
-            result["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
-        return result
+            tokenized_inputs["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
+        return tokenized_inputs
 
     def _init_linear_weights(self):
         self.model.classifier.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
@@ -136,7 +136,7 @@ class SentenceClassifier(BaseModel):
         else:
             label_to_id = {v: i for i, v in enumerate(label_list)}
         self.model.config.label2id = label_to_id
-        self.model.config.id2label = {id: label for label, id in self.config.label2id.items()}
+        self.model.config.id2label = {i: l for l, i in self.config.label2id.items()}
 
     def _preprocess_data(
         self,
@@ -145,7 +145,8 @@ class SentenceClassifier(BaseModel):
         pad_to_max_length: bool = True,
         overwrite_cache: bool = False,
         do_train: bool = True,
-        split: Text = "train"
+        split: Text = "train",
+        **kwargs,
     ):
         non_label_column_names = [name for name in dataset[split].column_names if name != "label"]
         if "input1" in non_label_column_names and "input2" in non_label_column_names:
