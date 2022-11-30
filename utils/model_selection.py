@@ -1,8 +1,17 @@
 import os
+import logging
+import sys
 
 from pick import pick
 from utils.helpers import pull_from_gcs, makerdir
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
 
 TEMP_DIR = "/tmp/octopus/models"
 
@@ -51,11 +60,14 @@ def select_model_suggestion():
     if option.startswith("momo-nlp/"):
         return option, PRIVATE_REPO_AUTH
     else:
+        logger.info("Using models from our GCS bucket")
         saved_model_path = os.path.join(TEMP_DIR, option)
         if os.path.exists(saved_model_path):
             return saved_model_path, None
         makerdir(saved_model_path)
+        logger.info(f"Start downloading {option} model weights from GCS...")
         for filename in MOBERTA_DOWNLOAD_LINKS[option]['files']:
             pull_from_gcs(os.path.join(MOBERTA_DOWNLOAD_LINKS[option]["bucket"], filename),
                           os.path.join(saved_model_path, filename))
+        logger.info(f"Downloading successfully. The model is saved at {saved_model_path}")
         return saved_model_path, None
