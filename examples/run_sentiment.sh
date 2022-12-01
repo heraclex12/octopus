@@ -1,0 +1,11 @@
+python3 run_cli.py train --task_name=sentence-classification \
+                          --model_name=roberta-base \
+                          --dataset_name=tweet_eval \
+                          --dataset_config_name=sentiment \
+                          --output_dir=./outputs \
+                          --lr=3e-5 \
+                          --epochs=3 \
+                          --max_length=128 \
+                          --batch_size=16 \
+                          --overwrite_output_dir \
+                          --fp16
