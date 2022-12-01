@@ -264,8 +264,13 @@ class TokenClassifier(BaseModel):
             [self.model.config.id2label[l] for (p, l) in zip(prediction, label) if l != -100]
             for prediction, label in zip(predictions, labels)
         ]
-
-        results = _DEFAULT_METRIC(predictions=true_predictions, references=true_labels)
+        if type(true_labels[0][0]) == int:
+            label_is_int = True
+            true_predictions = [p for prediction in true_predictions for p in prediction]
+            true_labels = [l for label in true_labels for l in label]
+        else:
+            label_is_int = False
+        results = _DEFAULT_METRIC(predictions=true_predictions, references=true_labels, label_is_int=label_is_int, **kwargs)
         if kwargs.get('return_entity_level_metrics'):
             # Unpack nested dictionaries
             final_results = {}
