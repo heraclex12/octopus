@@ -118,12 +118,12 @@ class TokenClassifier(BaseModel):
                     label_ids.append(-100)
                 # We set the label for the first token of each word.
                 elif word_idx != previous_word_idx:
-                    label_ids.append(self.model.config.label2id[label[word_idx]])
+                    label_ids.append(int(self.model.config.label2id[label[word_idx]]))
                 # For the other tokens in a word, we set the label to either the current label or -100, depending on
                 # the label_all_tokens flag.
                 else:
                     if label_all_tokens:
-                        label_ids.append(self.model.config.b2i_label[self.model.config.label2id[label[word_idx]]])
+                        label_ids.append(int(self.model.config.b2i_label[self.model.config.label2id[label[word_idx]]]))
                     else:
                         label_ids.append(-100)
                 previous_word_idx = word_idx
@@ -205,6 +205,7 @@ class TokenClassifier(BaseModel):
             batched=True,
             load_from_cache_file=not overwrite_cache,
             desc="Running tokenizer on dataset",
+            remove_columns=column_names,
             fn_kwargs={
                 'max_seq_length': max_seq_length,
                 'input_key': input_key,

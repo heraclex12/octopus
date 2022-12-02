@@ -21,7 +21,7 @@ def commands():
 
 
 @commands.command()
-@click.option('--task_name', help='Name of the training task. Currently we only support `sentence-classification')
+@click.option('--task_name', required=True, help='Name of the training task. Currently we only support `sentence-classification')
 @click.option('--model_name', help='Path to pretrained model or model identifier from huggingface.co/models.')
 @click.option('--output_dir', help='Where to store the final model.')
 @click.option('--dataset_name', help='The name of the dataset to use (via the datasets library).')
@@ -111,9 +111,9 @@ def train(
 
 
 @commands.command()
-@click.option('--task_name', help='Name of the training task. Currently we only support `sentence-classification')
-@click.option('--model_name', help='Path to pretrained model or model identifier from huggingface.co/models.')
-@click.option('--eval_file', help='A csv or a json file containing the evaluation data.')
+@click.option('--task_name', required=True, help='Name of the training task. Currently we only support `sentence-classification')
+@click.option('--model_name', required=True, help='Path to pretrained model or model identifier from huggingface.co/models.')
+@click.option('--eval_file', required=True, help='A csv or a json file containing the evaluation data.')
 @click.option('--output_dir', help='Where to store the evaluation results.')
 @click.option('--max_length', type=int, default=128, help='The maximum total input sequence length after tokenization.')
 @click.option('--padding', default='max_length', help='Whether to pad all samples to `max_length`.')
@@ -142,8 +142,10 @@ def evaluate(
     logger.setLevel(logging.INFO)
     if task_name == 'sentence-classification':
         model = SentenceClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
+    elif task_name == 'token-classification':
+        model = TokenClassifier(task_name, model_name, auth_token=hub_token, use_fast_tokenizer=use_fast)
     else:
-        raise ValueError("Currently we only support `sentence-classification`")
+        raise ValueError("Currently we only support `sentence-classification` and `token-classification`")
     if output_dir is None:
         output_dir = os.path.join(CURRENT_DIR, 'outputs/')
         makerdir(output_dir)

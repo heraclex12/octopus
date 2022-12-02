@@ -249,12 +249,19 @@ class BaseModel:
             **kwargs,
     ) -> Dict:
         extension = eval_file.split(".")[-1]
-        eval_dataset = load_dataset(
-            extension,
-            data_files={'validation': eval_file},
-            cache_dir=self.cache_dir,
-            use_auth_token=self.auth_token,
-        )
+        # assert extension in ["csv", "json"], "`eval_file` should be a csv or a json file."
+        if not extension in ["csv", "json"]:
+            eval_dataset = load_dataset(
+                eval_file,
+                cache_dir=self.cache_dir,
+                use_auth_token=self.auth_token,
+            )
+        else:
+            eval_dataset = load_dataset(
+                extension,
+                data_files={'validation': eval_file},
+                cache_dir=self.cache_dir,
+            )
         eval_dataset = self._preprocess_data(eval_dataset,
                                              max_seq_length=max_length,
                                              pad_to_max_length=padding,
