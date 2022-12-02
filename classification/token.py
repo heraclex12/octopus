@@ -182,9 +182,10 @@ class TokenClassifier(BaseModel):
         split: Text = "train",
         **kwargs,
     ):
-        column_names = [col for col in dataset[split].column_names if col != 'id']
-        input_key = "input" if 'input' in column_names else column_names[0]
-        label_key = "label" if 'label' in column_names else column_names[1]
+        column_names = dataset[split].column_names
+        non_id_column_names = [col for col in column_names if col != 'id']
+        input_key = "input" if 'input' in non_id_column_names else non_id_column_names[0]
+        label_key = "label" if 'label' in non_id_column_names else non_id_column_names[1]
         padding = "max_length" if pad_to_max_length else False
         if max_seq_length > self.tokenizer.model_max_length:
             logger.warning(

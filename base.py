@@ -249,19 +249,12 @@ class BaseModel:
             **kwargs,
     ) -> Dict:
         extension = eval_file.split(".")[-1]
-        # assert extension in ["csv", "json"], "`eval_file` should be a csv or a json file."
-        if not extension in ["csv", "json"]:
-            eval_dataset = load_dataset(
-                eval_file,
-                cache_dir=self.cache_dir,
-                use_auth_token=self.auth_token,
-            )
-        else:
-            eval_dataset = load_dataset(
-                extension,
-                data_files={'validation': eval_file},
-                cache_dir=self.cache_dir,
-            )
+        assert extension in ["csv", "json"], "`eval_file` should be a csv or a json file."
+        eval_dataset = load_dataset(
+            extension,
+            data_files={'validation': eval_file},
+            cache_dir=self.cache_dir,
+        )
         eval_dataset = self._preprocess_data(eval_dataset,
                                              max_seq_length=max_length,
                                              pad_to_max_length=padding,
@@ -279,9 +272,10 @@ class BaseModel:
         for step, batch in enumerate(eval_dataloader):
             with torch.no_grad():
                 outputs = self.forward(batch)
-            pred = outputs.logits.tolist()
+            pred = outputs.logits.cpu().tolist()
+            ref = batch["labels"].cpu().tolist()
             predictions.extend(pred)
-            references.extend(batch["labels"])
+            references.extend(ref)
 
         predictions = np.array(predictions)
         references = np.array(references)

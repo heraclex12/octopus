@@ -10,7 +10,10 @@ from sklearn.metrics import (
     mean_squared_error,
     classification_report
 )
-from seqeval.metrics import classification_report as entity_classification_report
+from seqeval.metrics import (
+    classification_report as entity_classification_report,
+    accuracy_score as entity_accuracy_score
+)
 
 
 SUPPORTED_METRICS = ["accuracy", "f1", "recall", "precision", "mse", "roc_auc", "seqeval"]
@@ -139,7 +142,7 @@ def seqeval(
         scores["overall_precision"] = overall_score["precision"]
         scores["overall_recall"] = overall_score["recall"]
         scores["overall_f1"] = overall_score["f1-score"]
-        scores["overall_accuracy"] = accuracy_score(y_true=references, y_pred=predictions)
+        scores["overall_accuracy"] = entity_accuracy_score(y_true=references, y_pred=predictions)
     else:
         overall_score = report.pop("accuracy")
         scores = {
