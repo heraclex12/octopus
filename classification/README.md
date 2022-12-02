@@ -1,6 +1,6 @@
-# Classification
+# Text Classification
 
-### About
+## About
 
 We provide an approach to finetune pretrained language models (i.g., BERT, RoBERTa, etc.) on
 Text Classification datasets.
@@ -14,14 +14,15 @@ You can use our framework for:
 🛸 Task name: `token-classification`
   - Token/Sequence Classification (i.g., Named entity recognition)
 
-### Sample Data Format
+## Usage
 
-#### For Sentence
+### ✨ Sentence Classification
+
+#### 1. Data Format
 Default column names: `input,label` or `input1,input2,label` (sentence pair)
 
-
 CSV format
-```
+```text
 input,label
 sentence1,label1
 sentence2,label2
@@ -35,12 +36,15 @@ JSON format
 ...
 ```
 
-Instead of using our default column names, you can use arbitrary column names for one or two first columns but have to make sure that
-your label column name is `label`.
+#### 2. Metrics
+- `accuracy`
+- `f1`
+- `recall`
+- `precision`
 
-#### For Token
+### ✨ Token Classification
+#### 1. Data Format
 Default column names: `input,label`
-
 
 CSV format (TBD)
 
@@ -50,3 +54,9 @@ JSON format
 {"id": 2, "input": ["tok1", "tok2"], "label": "<label_2>"}
 ...
 ```
+#### 2. Metrics
+`seqeval`
+
+----
+_Notes: Instead of using our default column names, you can use arbitrary column names for one or two first columns but have to make sure that
+your label column name is `label`._
