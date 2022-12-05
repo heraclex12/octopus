@@ -280,7 +280,9 @@ class TokenClassifier(BaseModel):
         return pre_entities
 
     def aggregate(self, pre_entities: List[dict]) -> List[dict]:
-        entities = []
+        entity_groups = []
+        entity_group_disagg = []
+        subword_prefix = self.tokenizer._tokenizer.model.continuing_subword_prefix
         for pre_entity in pre_entities:
             entity_idx = pre_entity["scores"].argmax()
             score = pre_entity["scores"][entity_idx]
@@ -292,23 +294,6 @@ class TokenClassifier(BaseModel):
                 "start": pre_entity["start"],
                 "end": pre_entity["end"],
             }
-            entities.append(entity)
-        return self.group_entities(entities)
-
-    @staticmethod
-    def get_tag(entity_name: str) -> Tuple[str, str]:
-        if entity_name.startswith("B-") or entity_name.startswith("I-"):
-            bi, tag = entity_name.split('-')
-        else:
-            bi = "B"
-            tag = entity_name
-        return bi, tag
-
-    def group_entities(self, entities: List[dict]) -> List[dict]:
-        entity_groups = []
-        entity_group_disagg = []
-        subword_prefix = self.tokenizer._tokenizer.model.continuing_subword_prefix
-        for entity in entities:
             if not entity_group_disagg:
                 entity_group_disagg.append(entity)
                 continue
@@ -325,6 +310,15 @@ class TokenClassifier(BaseModel):
             entity_groups.append(self.group_sub_entities(entity_group_disagg))
 
         return entity_groups
+
+    @staticmethod
+    def get_tag(entity_name: str) -> Tuple[str, str]:
+        if entity_name.startswith("B-") or entity_name.startswith("I-"):
+            bi, tag = entity_name.split('-')
+        else:
+            bi = "B"
+            tag = entity_name
+        return bi, tag
 
     def group_sub_entities(self, entities: List[dict]) -> dict:
         entity = entities[0]["entity"].split("-")[-1]

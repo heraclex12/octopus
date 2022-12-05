@@ -272,7 +272,7 @@ class BaseModel:
         for step, batch in enumerate(eval_dataloader):
             with torch.no_grad():
                 outputs = self.forward(batch)
-            pred = outputs.logits.cpu().tolist()
+            pred = outputs["logits"].cpu().tolist()
             ref = batch["labels"].cpu().tolist()
             predictions.extend(pred)
             references.extend(ref)
