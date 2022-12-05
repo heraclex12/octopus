@@ -113,7 +113,7 @@ Currently, we support applications below:
 - [Text Classification](./classification/README.md)
 - [Token Classification](./classification/README.md)
 
-Please refer to specific application example for more details.
+Please refer to specific application for more details.
 
 ## Contact
 

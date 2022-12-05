@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Text, Optional, Union, Dict, List, Any
+from typing import Text, Optional, Union, Dict, List, Any, Tuple
 
 import numpy as np
 from torch import nn, Tensor
@@ -218,40 +218,127 @@ class TokenClassifier(BaseModel):
         return processed_dataset
 
     def preprocess_input(self, inputs, **kwargs: Dict) -> Dict[str, Tensor]:
-        if isinstance(inputs, dict):
-            return self.tokenizer(**inputs, return_tensors='pt', **kwargs)
-        elif isinstance(inputs, list) and len(inputs) == 1 and isinstance(inputs[0], list) and len(inputs[0]) == 2:
-            return self.tokenizer(
-                text=inputs[0][0], text_pair=inputs[0][1], return_tensors='pt', **kwargs
-            )
-        elif isinstance(inputs, list) and len(inputs) == 2:
-            return self.tokenizer(
-                text=inputs[0], text_pair=inputs[1], return_tensors='pt', **kwargs
-            )
-        return self.tokenizer(inputs, return_tensors='pt', **kwargs)
+        truncation = True if self.tokenizer.model_max_length and self.tokenizer.model_max_length > 0 else False
+        model_inputs = self.tokenizer(
+            inputs,
+            return_tensors="pt",
+            truncation=truncation,
+            return_offsets_mapping=self.tokenizer.is_fast,
+        )
+        return model_inputs
+
+    def forward(self, model_inputs: Dict[str, Tensor]):
+        offset_mapping = model_inputs.pop("offset_mapping", None)
+        model_outputs = self.model(**model_inputs)
+        return {
+            "input_ids": model_inputs["input_ids"],
+            "offset_mapping": offset_mapping,
+            **model_outputs,
+        }
 
     def postprocess_output(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
-        outputs = model_outputs["logits"][0]
-        outputs = outputs.detach().numpy()
+        logits = model_outputs["logits"][0].detach().numpy()
+        input_ids = model_outputs["input_ids"][0]
+        offset_mapping = model_outputs["offset_mapping"][0] if model_outputs["offset_mapping"] is not None else None
 
-        if activation == 'sigmoid':
-            scores = sigmoid(outputs)
-        elif activation == 'softmax':
-            scores = softmax(outputs)
-        elif activation is None:
-            scores = outputs
-        else:
-            raise ValueError(f"Unrecognized `activation` argument: {activation}")
+        maxes = np.max(logits, axis=-1, keepdims=True)
+        shifted_exp = np.exp(logits - maxes)
+        scores = shifted_exp / shifted_exp.sum(axis=-1, keepdims=True)
 
-        if top_k == 1:
-            return {"label": self.model.config.id2label[scores.argmax().item()], "score": scores.max().item()}
+        pre_entities = self.gather_pre_entities(input_ids, scores, offset_mapping)
+        grouped_entities = self.aggregate(pre_entities)
+        return grouped_entities
+
+    def gather_pre_entities(
+        self,
+        input_ids: np.ndarray,
+        scores: np.ndarray,
+        offset_mapping: Optional[List[Tuple[int, int]]],
+    ) -> List[dict]:
+        pre_entities = []
+        for idx, token_scores in enumerate(scores):
+            if input_ids[idx] in self.tokenizer.all_special_ids:
+                continue
+            word = self.tokenizer.convert_ids_to_tokens(int(input_ids[idx]))
+            if offset_mapping is not None:
+                start_ind, end_ind = offset_mapping[idx]
+                if not isinstance(start_ind, int):
+                    start_ind = start_ind.item()
+                    end_ind = end_ind.item()
+            else:
+                start_ind = None
+                end_ind = None
+
+            pre_entity = {
+                "word": word,
+                "scores": token_scores,
+                "start": start_ind,
+                "end": end_ind,
+                "index": idx,
+            }
+            pre_entities.append(pre_entity)
+        return pre_entities
+
+    def aggregate(self, pre_entities: List[dict]) -> List[dict]:
+        entities = []
+        for pre_entity in pre_entities:
+            entity_idx = pre_entity["scores"].argmax()
+            score = pre_entity["scores"][entity_idx]
+            entity = {
+                "entity": self.model.config.id2label[entity_idx],
+                "score": score,
+                "index": pre_entity["index"],
+                "word": pre_entity["word"],
+                "start": pre_entity["start"],
+                "end": pre_entity["end"],
+            }
+            entities.append(entity)
+        return self.group_entities(entities)
+
+    @staticmethod
+    def get_tag(entity_name: str) -> Tuple[str, str]:
+        if entity_name.startswith("B-") or entity_name.startswith("I-"):
+            bi, tag = entity_name.split('-')
         else:
-            dict_scores = [
-                {"label": self.model.config.id2label[i], "score": score.item()} for i, score in enumerate(scores)
-            ]
-            dict_scores.sort(key=lambda x: x["score"], reverse=True)
-            dict_scores = dict_scores[:top_k]
-        return dict_scores
+            bi = "B"
+            tag = entity_name
+        return bi, tag
+
+    def group_entities(self, entities: List[dict]) -> List[dict]:
+        entity_groups = []
+        entity_group_disagg = []
+        subword_prefix = self.tokenizer._tokenizer.model.continuing_subword_prefix
+        for entity in entities:
+            if not entity_group_disagg:
+                entity_group_disagg.append(entity)
+                continue
+
+            bi, tag = self.get_tag(entity["entity"])
+            last_bi, last_tag = self.get_tag(entity_group_disagg[-1]["entity"])
+            is_subword = entity["word"].strip(subword_prefix) != entity["word"]
+            if tag == last_tag and bi != "B" or is_subword:
+                entity_group_disagg.append(entity)
+            else:
+                entity_groups.append(self.group_sub_entities(entity_group_disagg))
+                entity_group_disagg = [entity]
+        if entity_group_disagg:
+            entity_groups.append(self.group_sub_entities(entity_group_disagg))
+
+        return entity_groups
+
+    def group_sub_entities(self, entities: List[dict]) -> dict:
+        entity = entities[0]["entity"].split("-")[-1]
+        scores = np.nanmean([entity["score"] for entity in entities])
+        tokens = [entity["word"] for entity in entities]
+
+        entity_group = {
+            "entity_group": entity,
+            "score": np.mean(scores),
+            "word": self.tokenizer.convert_tokens_to_string(tokens),
+            "start": entities[0]["start"],
+            "end": entities[-1]["end"],
+        }
+        return entity_group
 
     def compute_metrics(self, p: EvalPrediction, metric: Optional[Text] = None, **kwargs):
         predictions, labels = p
