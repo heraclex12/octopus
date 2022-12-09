@@ -14,7 +14,6 @@ from transformers import (
 
 from base import BaseModel
 from utils import metrics
-from utils.helpers import sigmoid, softmax
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -150,15 +149,15 @@ class TokenClassifier(BaseModel):
                     self.model.classifier = nn.Linear(self.config.hidden_size, self.config.num_labels)
                     self._init_linear_weights()
                     logger.warning(
-                        f"Your model was initialized with different number of labels: ",
+                        f"Your model was initialized with different number of labels: "
                         f"model num labels: {self.config.num_labels}, dataset num labels: {num_labels}\n"
                         f"Re-initializing the linear classifier to match with the number of labels of the dataset."
                     )
                 else:
                     logger.warning(
-                        f"Your model seems to have been trained with labels, but they don't match the dataset: ",
+                        f"Your model seems to have been trained with labels, but they don't match the dataset: "
                         f"model labels: {list(sorted(label_name_to_id.keys()))}, dataset labels: {list(sorted(label_list))}."
-                        f"\nIgnoring the model labels as a result.",
+                        f"\nIgnoring the model labels as a result."
                     )
         else:
             label_to_id = {v: i for i, v in enumerate(label_list)}

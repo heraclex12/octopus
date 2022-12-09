@@ -1,7 +1,9 @@
+import importlib
 import logging
 import sys
 from typing import Text, Optional, Union, Dict, List, Any
 
+import transformers
 from torch import nn, Tensor
 from transformers import (
     AutoConfig,
@@ -23,6 +25,9 @@ logging.basicConfig(
 )
 
 _DEFAULT_METRIC = metrics.accuracy
+_CLASSIFIER_HEAD = {
+    "roberta": "RobertaClassificationHead",
+}
 
 
 class SentenceClassifier(BaseModel):
@@ -105,10 +110,28 @@ class SentenceClassifier(BaseModel):
             tokenized_inputs["label"] = [(label_to_id[l] if l != -1 else -1) for l in examples["label"]]
         return tokenized_inputs
 
-    def _init_linear_weights(self):
-        self.model.classifier.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        if self.model.classifier.bias is not None:
-            self.model.classifier.bias.data.zero_()
+    def _init_linear_weights(self, module):
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+
+    def _init_classifier(self):
+        classifier_type = _CLASSIFIER_HEAD.get(self.config.model_type)
+        if classifier_type:
+            module = importlib.import_module(
+                f"transformers.models.{self.config.model_type}.modeling_{self.config.model_type}")
+            self.model.classifier = getattr(module, classifier_type)(self.config)
+        else:
+            self.model.classifier = nn.Linear(self.config.hidden_size, self.config.num_labels)
+        if isinstance(self.model.classifier, nn.Linear):
+            self._init_linear_weights(self.model.classifier)
+        else:
+            for v in self.model.classifier.__dict__.values():
+                self._init_linear_weights(v)
 
     def _update_model_number_labels(self, label_list: List[Any]) -> None:
         num_labels = len(label_list)
@@ -119,19 +142,18 @@ class SentenceClassifier(BaseModel):
             else:
                 label_to_id = {v: i for i, v in enumerate(label_list)}
                 if num_labels != self.config.num_labels:
-                    self.model.num_labels = self.config.num_labels = num_labels
-                    self.model.classifier = nn.Linear(self.config.hidden_size, self.config.num_labels)
-                    self._init_linear_weights()
+                    self.model.num_labels = self.config.num_labels = self.num_labels = num_labels
+                    self._init_classifier()
                     logger.warning(
-                        f"Your model was initialized with different number of labels: ",
-                        f"model num labels: {self.config.num_labels}, dataset num labels: {num_labels}\n"
-                        f"Re-initializing the linear classifier to match with the number of labels of the dataset."
+                        f"Your model was initialized with different number of labels: "
+                        f"model num labels: {self.config.num_labels}, dataset num labels: {num_labels}"
+                        f"\nRe-initializing the linear classifier to match with the number of labels of the dataset."
                     )
                 else:
                     logger.warning(
-                        f"Your model seems to have been trained with labels, but they don't match the dataset: ",
-                        f"model labels: {list(sorted(label_name_to_id.keys()))}, dataset labels: {list(sorted(label_list))}."
-                        f"\nIgnoring the model labels as a result.",
+                        f"Your model seems to have been trained with labels, but they don't match the dataset: "
+                        f"model labels: {list(sorted(label_name_to_id.keys()))}, "
+                        f"dataset labels: {list(sorted(label_list))}.\nIgnoring the model labels as a result.",
                     )
         else:
             label_to_id = {v: i for i, v in enumerate(label_list)}
