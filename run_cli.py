@@ -41,6 +41,7 @@ def commands():
 @click.option('--epochs', type=int, default=3, help='Total number of training epochs to perform.')
 @click.option('--lr', type=float, default=3e-5, help='Initial learning rate (after the potential warmup period) to use.')
 @click.option('--warmup_steps', type=int, default=0, help='Number of steps for the warmup in the lr scheduler.')
+@click.option('--warmup_ratio', type=float, default=0.0, help='Ratio of total training steps used for a linear warmup from 0 to learning_rate.')
 @click.option('--gradient_accumulation_steps', type=int, default=1, help='Number of updates steps to accumulate '
                                                                          'before performing a backward/update pass.')
 @click.option('--weight_decay', type=float, default=0.0, help='Weight decay to use.')
@@ -66,6 +67,7 @@ def train(
         epochs: int = 3,
         lr: float = 3e-5,
         warmup_steps: int = 0,
+        warmup_ratio: float = 0.0,
         gradient_accumulation_steps: int = 1,
         weight_decay: float = 0.0,
         hub_token: Optional[Text] = None,
@@ -105,6 +107,7 @@ def train(
                 evaluation_strategy="epoch",
                 learning_rate=lr,
                 warmup_steps=warmup_steps,
+                warmup_ratio=warmup_ratio,
                 gradient_accumulation_steps=gradient_accumulation_steps,
                 weight_decay=weight_decay,
                 overwrite_output_dir=overwrite_output_dir)
@@ -113,7 +116,10 @@ def train(
 @commands.command()
 @click.option('--task_name', required=True, help='Name of the training task. Currently we only support `sentence-classification')
 @click.option('--model_name', required=True, help='Path to pretrained model or model identifier from huggingface.co/models.')
-@click.option('--eval_file', required=True, help='A csv or a json file containing the evaluation data.')
+@click.option('--eval_file', help='A csv or a json file containing the evaluation data.')
+@click.option('--eval_dataset_name', help='The name of the dataset to use (via the datasets library).')
+@click.option('--eval_dataset_config_name', help='The configuration name of the dataset to use (via the datasets library).')
+@click.option('--split', help='The split of the dataset to use (via the datasets library).')
 @click.option('--output_dir', help='Where to store the evaluation results.')
 @click.option('--max_length', type=int, default=128, help='The maximum total input sequence length after tokenization.')
 @click.option('--padding', default='max_length', help='Whether to pad all samples to `max_length`.')
@@ -129,6 +135,9 @@ def evaluate(
         model_name: Text,
         output_dir: Optional[Text] = None,
         eval_file: Optional[Text] = None,
+        eval_dataset_name: Optional[Text] = None,
+        eval_dataset_config_name: Optional[Text] = None,
+        split: Optional[Text] = None,
         max_length: Optional[int] = 128,
         padding: Union[bool, Text] = True,
         fp16: bool = True,
@@ -151,6 +160,9 @@ def evaluate(
         makerdir(output_dir)
 
     results = model.evaluate(eval_file,
+                             eval_dataset_name=eval_dataset_name,
+                             eval_dataset_config_name=eval_dataset_config_name,
+                             split=split,
                              batch_size=batch_size,
                              max_length=max_length,
                              padding=padding,
