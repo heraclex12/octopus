@@ -117,4 +117,4 @@ Please refer to specific application for more details.
 
 ## Contact
 
-If you want to get help or have any questions, don't hesitate to drop [me](mailto:heraclex12@gmail.com) a message
+If you want to get help or have any questions, don't hesitate to send an email to [heraclex12@gmail.com](mailto:heraclex12@gmail.com)
