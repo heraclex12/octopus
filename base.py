@@ -239,7 +239,10 @@ class BaseModel:
 
     def evaluate(
             self,
-            eval_file,
+            eval_file: Optional[Text] = None,
+            eval_dataset_name: Optional[Text] = None,
+            eval_dataset_config_name: Optional[Text] = None,
+            split: Text = "test",
             batch_size: int = 32,
             max_length: int = 128,
             padding: Union[bool, Text] = 'max_length',
@@ -248,21 +251,31 @@ class BaseModel:
             metric: Optional[Text] = None,
             **kwargs,
     ) -> Dict:
-        extension = eval_file.split(".")[-1]
-        assert extension in ["csv", "json"], "`eval_file` should be a csv or a json file."
-        eval_dataset = load_dataset(
-            extension,
-            data_files={'validation': eval_file},
-            cache_dir=self.cache_dir,
-        )
+        split = "test" if not split else split
+        if eval_file is not None:
+            extension = eval_file.split(".")[-1]
+            assert extension in ["csv", "json"], "`eval_file` should be a csv or a json file."
+            eval_dataset = load_dataset(
+                extension,
+                data_files={split: eval_file},
+                cache_dir=self.cache_dir,
+            )
+        elif eval_dataset_name is not None:
+            eval_dataset = load_dataset(
+                eval_dataset_name,
+                eval_dataset_config_name,
+                cache_dir=self.cache_dir,
+            )
+        else:
+            raise ValueError(f"`eval_file` or `eval_dataset_name` must be not empty!")
         eval_dataset = self._preprocess_data(eval_dataset,
                                              max_seq_length=max_length,
                                              pad_to_max_length=padding,
                                              overwrite_cache=overwrite_cache,
                                              do_train=False,
-                                             split="validation",
+                                             split=split,
                                              **kwargs)
-        eval_dataloader = DataLoader(eval_dataset["validation"],
+        eval_dataloader = DataLoader(eval_dataset[split],
                                      collate_fn=self._get_collator(padding, fp16),
                                      batch_size=batch_size)
 
