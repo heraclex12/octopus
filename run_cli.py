@@ -130,6 +130,7 @@ def train(
                                                                'the metrics (used for recall/precision/f1)')
 @click.option('--hub_token', help='The token to use to pull the model from HuggingFace Hub.')
 @click.option('--use_fast', is_flag=True, default=True, help='Whether to use fast Tokenizer.')
+@click.option('--no_cuda', is_flag=False, default=True, help='Whether to use CUDA to train on GPU.')
 def evaluate(
         task_name: Text,
         model_name: Text,
@@ -146,6 +147,7 @@ def evaluate(
         metric_average: Optional[Text] = None,
         hub_token: Optional[Text] = None,
         use_fast: bool = True,
+        no_cuda: bool = False,
         **kwargs
 ):
     logger.setLevel(logging.INFO)
@@ -169,6 +171,7 @@ def evaluate(
                              fp16=fp16,
                              metric=metric,
                              average=metric_average,
+                             no_cuda=no_cuda,
                              **kwargs)
     with open(os.path.join(output_dir, "evaluation_results.json"), 'w') as f:
         results['task_name'] = task_name
