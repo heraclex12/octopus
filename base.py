@@ -249,6 +249,7 @@ class BaseModel:
             fp16: bool = True,
             overwrite_cache: bool = False,
             metric: Optional[Text] = None,
+            no_cuda: bool = False,
             **kwargs,
     ) -> Dict:
         split = "test" if not split else split
@@ -279,11 +280,14 @@ class BaseModel:
                                      collate_fn=self._get_collator(padding, fp16),
                                      batch_size=batch_size)
 
+        device = "cuda" if not no_cuda and torch.cuda.is_available() else "cpu"
+        self.model.to(device)
         self.model.eval()
         predictions = []
         references = []
         for step, batch in enumerate(eval_dataloader):
             with torch.no_grad():
+                batch = {k: v.to(device) for k, v in batch.items()}
                 outputs = self.forward(batch)
             pred = outputs["logits"].cpu().tolist()
             ref = batch["labels"].cpu().tolist()
