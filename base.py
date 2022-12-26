@@ -300,8 +300,8 @@ class BaseModel:
         logger.info(f"{eval_metric}")
         return eval_metric
 
-    def predict(self, inputs, activation: Text = "softmax", top_k: int = 1):
-        model_inputs = self.preprocess_input(inputs)
+    def predict(self, inputs, activation: Text = "softmax", top_k: int = 1, **kwargs: Dict):
+        model_inputs = self.preprocess_input(inputs, **kwargs)
         model_outputs = self.forward(model_inputs)
         outputs = self.postprocess_output(model_outputs, activation, top_k)
         return outputs
