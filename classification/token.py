@@ -223,6 +223,7 @@ class TokenClassifier(BaseModel):
             return_tensors="pt",
             truncation=truncation,
             return_offsets_mapping=self.tokenizer.is_fast,
+            **kwargs,
         )
         return model_inputs
 
