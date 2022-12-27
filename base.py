@@ -46,6 +46,7 @@ class BaseModel:
             use_tf: bool = False,
             use_fast_tokenizer: bool = True,
             ignore_mismatched_sizes: bool = False,
+            no_cuda: bool = False,
     ):
         self.model_name = model_name
         self.cache_dir = cache_dir
@@ -56,6 +57,7 @@ class BaseModel:
         self.config = PretrainedConfig
         self.model = PreTrainedModel
         self.tokenizer = PreTrainedTokenizerFast
+        self.device = "cuda" if not no_cuda and torch.cuda.is_available() else "cpu"
 
     def _train(
             self,
@@ -279,15 +281,12 @@ class BaseModel:
         eval_dataloader = DataLoader(eval_dataset[split],
                                      collate_fn=self._get_collator(padding, fp16),
                                      batch_size=batch_size)
-
-        device = "cuda" if not no_cuda and torch.cuda.is_available() else "cpu"
-        self.model.to(device)
         self.model.eval()
         predictions = []
         references = []
         for step, batch in enumerate(eval_dataloader):
             with torch.no_grad():
-                batch = {k: v.to(device) for k, v in batch.items()}
+                batch = {k: v.to(self.device) for k, v in batch.items()}
                 outputs = self.forward(batch)
             pred = outputs["logits"].cpu().tolist()
             ref = batch["labels"].cpu().tolist()
@@ -310,6 +309,7 @@ class BaseModel:
         return self.tokenizer(inputs, return_tensors='pt', **kwargs)
 
     def forward(self, model_inputs: Dict[str, Tensor]):
+        model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
         return self.model(**model_inputs)
 
     def postprocess_output(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:

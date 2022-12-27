@@ -41,6 +41,7 @@ class SentenceClassifier(BaseModel):
         use_tf: bool = False,
         use_fast_tokenizer: bool = True,
         ignore_mismatched_sizes: bool = True,
+        no_cuda: bool = False,
     ):
         super().__init__(
             model_name=model_name,
@@ -48,7 +49,8 @@ class SentenceClassifier(BaseModel):
             auth_token=auth_token,
             use_tf=use_tf,
             use_fast_tokenizer=use_fast_tokenizer,
-            ignore_mismatched_sizes=ignore_mismatched_sizes
+            ignore_mismatched_sizes=ignore_mismatched_sizes,
+            no_cuda=no_cuda,
         )
         self.task_name = task_name
         if num_labels is not None:
@@ -80,6 +82,7 @@ class SentenceClassifier(BaseModel):
             use_auth_token=self.auth_token,
             ignore_mismatched_sizes=self.ignore_mismatched_sizes,
         )
+        self.model.to(self.device)
 
     def _get_collator(self, padding: bool = True, fp16: bool = True):
         if padding:
