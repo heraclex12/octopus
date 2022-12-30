@@ -241,7 +241,7 @@ class TokenClassifier(BaseModel):
         }
 
     def postprocess_output(self, model_outputs, activation: Text = "softmax", top_k: int = 1) -> Any:
-        logits = model_outputs["logits"][0].detach().numpy()
+        logits = model_outputs["logits"][0].cpu().detach().numpy()
         input_ids = model_outputs["input_ids"][0]
         offset_mapping = model_outputs["offset_mapping"][0] if model_outputs["offset_mapping"] is not None else None
 
