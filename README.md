@@ -11,9 +11,9 @@ $ pip install -r requirements.txt
 ```
 
 Some dependencies include:
-- transformers==4.24.0
-- datasets==2.7.0
-- torch==1.12.1
+- transformers>=4.24.0
+- datasets>=2.7.0
+- torch>=1.12.1
 
 If you want to use a GPU/CUDA, you must install PyTorch with the matching CUDA Version.
 Follow [PyTorch - Get Started](https://pytorch.org/get-started/locally/) for further details how to install PyTorch.
